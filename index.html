@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>X and 0 by Chakus</title>
+  <!-- PeerJS for local/online multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -15,16 +17,15 @@
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      /* Vibrant Sky Blue Gradient Background */
       background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%);
     }
     .container {
       text-align: center;
-      background: #0f172a; /* Dark sleek container - NO WHITE */
+      background: #0f172a;
       padding: 25px 20px;
       border-radius: 20px;
       box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-      max-width: 360px;
+      max-width: 380px;
       width: 92%;
       border: 1px solid #1e293b;
     }
@@ -43,7 +44,74 @@
       letter-spacing: 1.5px;
     }
     
-    /* Dark Scoreboard */
+    /* Mode Selection Screen */
+    #menu-screen {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .menu-btn {
+      padding: 12px;
+      font-size: 1rem;
+      background-color: #0284c7;
+      color: #f8fafc;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+    .menu-btn:hover {
+      background-color: #0369a1;
+    }
+
+    #multiplayer-setup {
+      display: none;
+      margin-top: 15px;
+      text-align: left;
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+    #multiplayer-setup label {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    #multiplayer-setup input {
+      width: 100%;
+      padding: 10px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+    .room-code-display {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+      border: 1px dashed #475569;
+      user-select: all;
+    }
+
+    /* Game Screen (Hidden initially until mode chosen) */
+    #game-screen {
+      display: none;
+    }
+
     .scoreboard {
       display: flex;
       justify-content: space-around;
@@ -69,7 +137,7 @@
     .score-tie span { color: #facc15; }
 
     .status {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       margin-bottom: 15px;
       font-weight: bold;
       color: #e2e8f0;
@@ -110,7 +178,6 @@
       cursor: not-allowed;
     }
     
-    /* Neon Red X, Neon Green 0 */
     .cell.x {
       color: #ef4444;
       text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
@@ -120,7 +187,6 @@
       text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
     }
     
-    /* Precise Winning Line */
     #winning-line {
       position: absolute;
       background-color: #f59e0b;
@@ -168,33 +234,57 @@
     <h1>X and 0</h1>
     <div class="subtitle">by Chakus</div>
     
-    <!-- Scoreboard -->
-    <div class="scoreboard">
-      <div class="score-box score-x">Player X <span id="scoreX">0</span></div>
-      <div class="score-box score-tie">Ties <span id="scoreTie">0</span></div>
-      <div class="score-box score-o">Player 0 <span id="scoreO">0</span></div>
+    <!-- MENU SCREEN -->
+    <div id="menu-screen">
+      <button class="menu-btn" onclick="startLocalPlay()">Play Locally (Same Device)</button>
+      <button class="menu-btn" onclick="showMultiplayerSetup()">Local Wi-Fi / Hotspot Multiplayer</button>
     </div>
 
-    <div id="status" class="status">Player X's Turn</div>
-    
-    <div class="board-wrapper">
-      <div class="board" id="board">
-        <div class="cell" data-index="0"></div>
-        <div class="cell" data-index="1"></div>
-        <div class="cell" data-index="2"></div>
-        <div class="cell" data-index="3"></div>
-        <div class="cell" data-index="4"></div>
-        <div class="cell" data-index="5"></div>
-        <div class="cell" data-index="6"></div>
-        <div class="cell" data-index="7"></div>
-        <div class="cell" data-index="8"></div>
+    <!-- MULTIPLAYER SETUP SCREEN -->
+    <div id="multiplayer-setup">
+      <div id="host-section">
+        <label>Your Room Code:</label>
+        <div class="room-code-display" id="my-peer-id">Generating...</div>
+        <button class="menu-btn" onclick="copyCode()" style="margin-bottom:10px; width:100%;">Copy Room Code</button>
       </div>
-      <div id="winning-line"></div>
+      
+      <div id="join-section" style="margin-top: 10px;">
+        <label for="peer-id-input">Enter Brother's Room Code:</label>
+        <input type="text" id="peer-id-input" placeholder="Paste code here..." />
+        <button class="menu-btn" onclick="connectToPeer()" style="width:100%;">Connect & Play</button>
+      </div>
+      <button class="secondary menu-btn" onclick="backToMenu()" style="width:100%; margin-top:10px;">Back</button>
     </div>
 
-    <div class="btn-container">
-      <button id="restartBtn">Restart Game</button>
-      <button id="resetScoresBtn" class="secondary">Reset Scores</button>
+    <!-- GAME SCREEN -->
+    <div id="game-screen">
+      <div class="scoreboard">
+        <div class="score-box score-x">Player X <span id="scoreX">0</span></div>
+        <div class="score-box score-tie">Ties <span id="scoreTie">0</span></div>
+        <div class="score-box score-o">Player 0 <span id="scoreO">0</span></div>
+      </div>
+
+      <div id="status" class="status">Connecting...</div>
+      
+      <div class="board-wrapper">
+        <div class="board" id="board">
+          <div class="cell" data-index="0"></div>
+          <div class="cell" data-index="1"></div>
+          <div class="cell" data-index="2"></div>
+          <div class="cell" data-index="3"></div>
+          <div class="cell" data-index="4"></div>
+          <div class="cell" data-index="5"></div>
+          <div class="cell" data-index="6"></div>
+          <div class="cell" data-index="7"></div>
+          <div class="cell" data-index="8"></div>
+        </div>
+        <div id="winning-line"></div>
+      </div>
+
+      <div class="btn-container">
+        <button id="restartBtn">Reset Board</button>
+        <button onclick="backToMenu()" class="secondary">Main Menu</button>
+      </div>
     </div>
   </div>
 
@@ -202,7 +292,6 @@
     const cells = document.querySelectorAll('.cell');
     const statusText = document.querySelector('#status');
     const restartBtn = document.querySelector('#restartBtn');
-    const resetScoresBtn = document.querySelector('#resetScoresBtn');
     const winningLine = document.querySelector('#winning-line');
     const boardEl = document.querySelector('#board');
 
@@ -210,26 +299,34 @@
     const scoreOEl = document.querySelector('#scoreO');
     const scoreTieEl = document.querySelector('#scoreTie');
 
+    const menuScreen = document.querySelector('#menu-screen');
+    const multiplayerSetup = document.querySelector('#multiplayer-setup');
+    const gameScreen = document.querySelector('#game-screen');
+    const myPeerIdDisplay = document.querySelector('#my-peer-id');
+    const peerIdInput = document.querySelector('#peer-id-input');
+
     const winPatterns = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Horizontal
-      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Vertical
-      [0, 4, 8], [2, 4, 6]             // Diagonal
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
     ];
 
     let options = ["", "", "", "", "", "", "", "", ""];
     let currentPlayer = "X";
     let running = true;
-
-    // Fixed keys: X, 0, ties
     let scores = { X: 0, 0: 0, ties: 0 };
 
-    // Built-in Web Audio API Synthesizer
+    // Multiplayer variables
+    let isMultiplayer = false;
+    let peer = null;
+    let conn = null;
+    let myAssignedSymbol = "X"; // Host is X, Client is 0
+
+    // Web Audio Synthesizer
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
       if (!audioCtx) return;
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const osc = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
       osc.connect(gainNode);
@@ -242,9 +339,9 @@
         osc.start();
         osc.stop(audioCtx.currentTime + 0.08);
       } else if (type === 'win') {
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
         gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.45);
         osc.start();
@@ -259,37 +356,137 @@
       }
     }
 
-    initGame();
-
-    function initGame() {
-      cells.forEach(cell => cell.addEventListener('click', cellClicked));
-      restartBtn.addEventListener('click', () => resetGame(true));
-      resetScoresBtn.addEventListener('click', resetScores);
-      statusText.textContent = `Player ${currentPlayer}'s Turn`;
+    function startLocalPlay() {
+      isMultiplayer = false;
+      menuScreen.style.display = 'none';
+      gameScreen.style.display = 'block';
+      resetGame(true);
     }
+
+    function showMultiplayerSetup() {
+      menuScreen.style.display = 'none';
+      multiplayerSetup.style.display = 'block';
+
+      // Initialize PeerJS host connection
+      if (!peer) {
+        // Generates a random short ID code
+        const randomId = 'chakus-' + Math.floor(1000 + Math.random() * 9000);
+        peer = new Peer(randomId);
+
+        peer.on('open', (id) => {
+          myPeerIdDisplay.textContent = id;
+        });
+
+        peer.on('connection', (connection) => {
+          conn = connection;
+          isMultiplayer = true;
+          myAssignedSymbol = "X"; // Host is Player X
+          setupConnectionListeners();
+          multiplayerSetup.style.display = 'none';
+          gameScreen.style.display = 'block';
+          resetGame(true);
+        });
+      }
+    }
+
+    function connectToPeer() {
+      const code = peerIdInput.value.trim();
+      if (!code) {
+        alert('Please enter a valid room code.');
+        return;
+      }
+
+      conn = peer.connect(code);
+      isMultiplayer = true;
+      myAssignedSymbol = "0"; // Connecting player is Player 0
+
+      conn.on('open', () => {
+        setupConnectionListeners();
+        multiplayerSetup.style.display = 'none';
+        gameScreen.style.display = 'block';
+        resetGame(true);
+      });
+    }
+
+    function setupConnectionListeners() {
+      conn.on('data', (data) => {
+        if (data.type === 'move') {
+          handleRemoteMove(data.index);
+        } else if (data.type === 'reset') {
+          resetGame(false, data.nextPlayer);
+        }
+      });
+    }
+
+    function copyCode() {
+      navigator.clipboard.writeText(myPeerIdDisplay.textContent);
+      alert('Room code copied to clipboard!');
+    }
+
+    function backToMenu() {
+      if (conn) conn.close();
+      if (peer) peer.destroy();
+      peer = null;
+      conn = null;
+      gameScreen.style.display = 'none';
+      multiplayerSetup.style.display = 'none';
+      menuScreen.style.display = 'flex';
+    }
+
+    // Game Logic
+    cells.forEach(cell => cell.addEventListener('click', cellClicked));
+    restartBtn.addEventListener('click', () => {
+      resetGame(true);
+      if (isMultiplayer && conn) {
+        conn.send({ type: 'reset', nextPlayer: currentPlayer });
+      }
+    });
 
     function cellClicked() {
       const cellIndex = this.getAttribute('data-index');
 
-      if (options[cellIndex] !== "" || !running) {
-        return;
-      }
+      if (options[cellIndex] !== "" || !running) return;
+
+      // In multiplayer, ensure it's your turn and you play your assigned symbol
+      if (isMultiplayer && currentPlayer !== myAssignedSymbol) return;
 
       playSound('click');
-      updateCell(this, cellIndex);
-      checkWinner();
+      executeMove(cellIndex, currentPlayer);
+
+      if (isMultiplayer && conn) {
+        conn.send({ type: 'move', index: cellIndex });
+      }
     }
 
-    function updateCell(cell, index) {
-      options[index] = currentPlayer;
-      cell.textContent = currentPlayer;
+    function handleRemoteMove(index) {
+      playSound('click');
+      executeMove(index, currentPlayer);
+    }
+
+    function executeMove(index, playerSymbol) {
+      options[index] = playerSymbol;
+      const cell = cells[index];
+      cell.textContent = playerSymbol;
       cell.classList.add('taken');
-      cell.classList.add(currentPlayer === 'X' ? 'x' : 'o');
+      cell.classList.add(playerSymbol === 'X' ? 'x' : 'o');
+      checkWinner();
     }
 
     function changePlayer() {
       currentPlayer = (currentPlayer === "X") ? "0" : "X";
-      statusText.textContent = `Player ${currentPlayer}'s Turn`;
+      updateStatusText();
+    }
+
+    function updateStatusText() {
+      if (isMultiplayer) {
+        if (currentPlayer === myAssignedSymbol) {
+          statusText.textContent = `Your Turn (${currentPlayer})`;
+        } else {
+          statusText.textContent = `Brother's Turn (${currentPlayer})`;
+        }
+      } else {
+        statusText.textContent = `Player ${currentPlayer}'s Turn`;
+      }
     }
 
     function checkWinner() {
@@ -301,10 +498,7 @@
         const cellB = options[combo[1]];
         const cellC = options[combo[2]];
 
-        if (cellA === "" || cellB === "" || cellC === "") {
-          continue;
-        }
-        if (cellA === cellB && cellB === cellC) {
+        if (cellA !== "" && cellA === cellB && cellB === cellC) {
           winningCombo = combo;
           break;
         }
@@ -316,11 +510,9 @@
         playSound('win');
         drawWinningLine(winningCombo);
         
-        // Correctly update scores for X or 0
         scores[currentPlayer]++;
         updateScoreboard();
 
-        // Auto restart game after 2 seconds
         setTimeout(() => {
           resetGame(false);
         }, 2000);
@@ -332,7 +524,6 @@
         scores.ties++;
         updateScoreboard();
 
-        // Auto restart game after 2 seconds
         setTimeout(() => {
           resetGame(false);
         }, 2000);
@@ -342,13 +533,11 @@
       }
     }
 
-    // Precise coordinate calculation for winning line
     function drawWinningLine(combo) {
       const cellA = cells[combo[0]].getBoundingClientRect();
       const cellC = cells[combo[2]].getBoundingClientRect();
       const wrapperRect = boardEl.parentElement.getBoundingClientRect();
 
-      // Center points relative to wrapper
       const x1 = (cellA.left + cellA.width / 2) - wrapperRect.left;
       const y1 = (cellA.top + cellA.height / 2) - wrapperRect.top;
       const x2 = (cellC.left + cellC.width / 2) - wrapperRect.left;
@@ -359,20 +548,23 @@
 
       winningLine.style.width = `${distance}px`;
       winningLine.style.left = `${x1}px`;
-      winningLine.style.top = `${y1 - 3}px`; // 3px offset for 6px line height center
+      winningLine.style.top = `${y1 - 3}px`;
       winningLine.style.transform = `rotate(${angle}deg)`;
       winningLine.style.display = 'block';
     }
 
-    function resetGame(manualRestart = false) {
+    function resetGame(manualRestart = false, nextPlr = "X") {
       if (manualRestart) {
         currentPlayer = "X";
       } else {
-        currentPlayer = (currentPlayer === "X") ? "0" : "X";
+        currentPlayer = nextPlr;
+        if (!isMultiplayer) {
+          currentPlayer = (currentPlayer === "X") ? "0" : "X";
+        }
       }
 
       options = ["", "", "", "", "", "", "", "", ""];
-      statusText.textContent = `Player ${currentPlayer}'s Turn`;
+      updateStatusText();
       winningLine.style.display = 'none';
       cells.forEach(cell => {
         cell.textContent = "";
@@ -381,19 +573,12 @@
       running = true;
     }
 
-    function resetScores() {
-      scores = { X: 0, 0: 0, ties: 0 };
-      updateScoreboard();
-      resetGame(true);
-    }
-
     function updateScoreboard() {
       scoreXEl.textContent = scores.X;
       scoreOEl.textContent = scores['0'];
       scoreTieEl.textContent = scores.ties;
     }
 
-    // Adjust winning line position if browser window is resized during a win
     window.addEventListener('resize', () => {
       if (!running && winningLine.style.display === 'block') {
         const lastWinnerCombo = winPatterns.find(combo => {
